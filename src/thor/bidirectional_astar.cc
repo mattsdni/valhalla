@@ -5,7 +5,6 @@
 #include "baldr/graphtile.h"
 #include "midgard/logging.h"
 #include <algorithm>
-//#include <bits/stdint-uintn.h>
 
 using namespace valhalla::midgard;
 using namespace valhalla::baldr;
@@ -29,21 +28,21 @@ bool is_derived_deadend(GraphReader& graphreader,
   // 2. tile should contain the pred edge.
 
   auto check_neighbors = [&graphreader, &edgelabels, &costing,
-                          is_forward_search](const GraphTile* tile, const GraphId& graphId,
+                          is_forward_search](const GraphTile* tile, GraphId graphId,
                                              const BDEdgeLabel& pred,
                                              const DirectedEdge*& valid_edge) {
     int num_valid_neighbors = 0;
     // TODO REVERESE Does GetDirectedEdges not differentiate between outbound/inbound?
     for (const auto& outgoing_candidate_edge : tile->GetDirectedEdges(pred.endnode())) {
 
-      GraphId edge_id = {graphId.tileid(), graphId.level(), tile->node(graphId)->edge_index()};
-      if (costing->Restricted(&outgoing_candidate_edge, pred, edgelabels, tile, edge_id,
+      GraphId out_going_edge_id = graphId;
+      if (costing->Restricted(&outgoing_candidate_edge, pred, edgelabels, tile, out_going_edge_id,
                               is_forward_search, 0, 0)) {
         continue;
       }
 
       if (is_forward_search) {
-        if (!costing->Allowed(&outgoing_candidate_edge, pred, tile, edge_id, 0, 0)) {
+        if (!costing->Allowed(&outgoing_candidate_edge, pred, tile, out_going_edge_id, 0, 0)) {
           continue;
         }
 
@@ -56,12 +55,10 @@ bool is_derived_deadend(GraphReader& graphreader,
         const GraphTile* t2 = outgoing_candidate_edge.leaves_tile()
                                   ? graphreader.GetGraphTile(outgoing_candidate_edge.endnode())
                                   : tile;
-        GraphId oppedge_graph_id = t2->GetOpposingEdgeId(&outgoing_candidate_edge);
-        const DirectedEdge* incoming_candidate_edge = tile->directededge(oppedge_graph_id);
-        edge_id.set_id(incoming_candidate_edge - tile->directededge(0));
-
+        GraphId incoming_edge_id = t2->GetOpposingEdgeId(&outgoing_candidate_edge);
+        const DirectedEdge* incoming_candidate_edge = t2->directededge(incoming_edge_id);
         if (!costing->AllowedReverse(&outgoing_candidate_edge, pred, incoming_candidate_edge, tile,
-                                     edge_id, 0, 0)) {
+                                     incoming_edge_id, 0, 0)) {
           continue;
         }
 
