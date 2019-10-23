@@ -526,8 +526,8 @@ iterable_t<const DirectedEdge> GraphTile::GetDirectedEdges(const size_t idx) con
     return iterable_t<const DirectedEdge>{edge, nodeinfo.edge_count()};
   }
   throw std::runtime_error(
-      "GraphTile NodeInfo index out of bounds 5: " + std::to_string(header_->graphid().tileid()) + "," +
-      std::to_string(header_->graphid().level()) + "," + std::to_string(idx) +
+      "GraphTile NodeInfo index out of bounds 5: " + std::to_string(header_->graphid().tileid()) +
+      "," + std::to_string(header_->graphid().level()) + "," + std::to_string(idx) +
       " nodecount= " + std::to_string(header_->nodecount()));
 }
 
