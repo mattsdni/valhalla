@@ -29,20 +29,21 @@ bool is_derived_deadend(GraphReader& graphreader,
   // 2. tile should contain the pred edge.
 
   auto check_neighbors = [&graphreader, &edgelabels, &costing,
-                          is_forward_search](const GraphTile* tile, const BDEdgeLabel& pred,
+                          is_forward_search](const GraphTile* tile, const GraphId& graphId,
+                                             const BDEdgeLabel& pred,
                                              const DirectedEdge*& valid_edge) {
     int num_valid_neighbors = 0;
     // TODO REVERESE Does GetDirectedEdges not differentiate between outbound/inbound?
     for (const auto& outgoing_candidate_edge : tile->GetDirectedEdges(pred.endnode())) {
 
-      auto edge_id = {tile->id(), tile->leve, pred.edgeid()};
-      if (costing->Restricted(outgoing_candidate_edge, pred, edgelabels, tile, edge_id,
+      GraphId edge_id = {graphId.tileid(), graphId.level(), tile->node(graphId)->edge_index()};
+      if (costing->Restricted(&outgoing_candidate_edge, pred, edgelabels, tile, edge_id,
                               is_forward_search, 0, 0)) {
         continue;
       }
 
       if (is_forward_search) {
-        if (!costing->Allowed(outgoing_candidate_edge, pred, tile, edge_id, 0, 0)) {
+        if (!costing->Allowed(&outgoing_candidate_edge, pred, tile, edge_id, 0, 0)) {
           continue;
         }
 
@@ -75,13 +76,11 @@ bool is_derived_deadend(GraphReader& graphreader,
 
   int num_valid_neighbors = 0;
   const DirectedEdge* valid_edge = nullptr;
-
-  num_valid_neighbors += check_neighbors(tile, pred, valid_edge);
-
+  num_valid_neighbors += check_neighbors(tile, pred.endnode(), pred, valid_edge);
   // Check edges on other levels
   for (const auto& sibling_node : tile->GetNodeTransitions(tile->node(pred.endnode()))) {
     tile = graphreader.GetGraphTile(sibling_node.endnode());
-    num_valid_neighbors += check_neighbors(tile, sibling_node.endnode(), valid_edge);
+    num_valid_neighbors += check_neighbors(tile, sibling_node.endnode(), pred, valid_edge);
   }
 
   // If only one neighbor, check if opposing edge to pred_edge
@@ -91,7 +90,6 @@ bool is_derived_deadend(GraphReader& graphreader,
   // REVERSE is this check the same in reverse search
   return false;
 }
-} // namespace thor
 
 constexpr uint64_t kInitialEdgeLabelCountBD = 1000000;
 
@@ -897,6 +895,5 @@ std::vector<std::vector<PathInfo>> BidirectionalAStar::FormPath(GraphReader& gra
   }
   return paths;
 }
-
-} // namespace valhalla
+} // namespace thor
 } // namespace valhalla
