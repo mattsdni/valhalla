@@ -293,6 +293,10 @@ public:
     return deadend_;
   }
 
+  void set_dead_end(bool dead_end) {
+    deadend_ = dead_end;
+  }
+
 protected:
   // predecessor_: Index to the predecessor edge label information.
   // Note: invalid predecessor value uses all 32 bits (so if this needs to

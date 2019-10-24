@@ -32,10 +32,10 @@ bool is_derived_deadend(GraphReader& graphreader,
                                              const BDEdgeLabel& pred,
                                              const DirectedEdge*& valid_edge) {
     int num_valid_neighbors = 0;
-    // TODO REVERESE Does GetDirectedEdges not differentiate between outbound/inbound?
-    for (const auto& outgoing_candidate_edge : tile->GetDirectedEdges(pred.endnode())) {
+    for (const auto& outgoing_candidate_edge : tile->GetDirectedEdges(graphId)) {
 
-      GraphId out_going_edge_id = graphId;
+      GraphId out_going_edge_id = tile->header()->graphid();
+      out_going_edge_id.set_id(&outgoing_candidate_edge - tile->directededge(0));
       if (costing->Restricted(&outgoing_candidate_edge, pred, edgelabels, tile, out_going_edge_id,
                               is_forward_search, 0, 0)) {
         continue;
@@ -57,7 +57,7 @@ bool is_derived_deadend(GraphReader& graphreader,
                                   : tile;
         GraphId incoming_edge_id = t2->GetOpposingEdgeId(&outgoing_candidate_edge);
         const DirectedEdge* incoming_candidate_edge = t2->directededge(incoming_edge_id);
-        if (!costing->AllowedReverse(&outgoing_candidate_edge, pred, incoming_candidate_edge, tile,
+        if (!costing->AllowedReverse(&outgoing_candidate_edge, pred, incoming_candidate_edge, t2,
                                      incoming_edge_id, 0, 0)) {
           continue;
         }
@@ -73,16 +73,25 @@ bool is_derived_deadend(GraphReader& graphreader,
 
   int num_valid_neighbors = 0;
   const DirectedEdge* valid_edge = nullptr;
-  num_valid_neighbors += check_neighbors(tile, pred.endnode(), pred, valid_edge);
+  GraphId graphId = pred.endnode();
+  tile = graphreader.GetGraphTile(pred.endnode());
+  num_valid_neighbors += check_neighbors(tile, graphId, pred, valid_edge);
   // Check edges on other levels
+
   for (const auto& sibling_node : tile->GetNodeTransitions(tile->node(pred.endnode()))) {
+    graphId = sibling_node.endnode();
     tile = graphreader.GetGraphTile(sibling_node.endnode());
-    num_valid_neighbors += check_neighbors(tile, sibling_node.endnode(), pred, valid_edge);
+    num_valid_neighbors += check_neighbors(tile, graphId, pred, valid_edge);
   }
 
   // If only one neighbor, check if opposing edge to pred_edge
   if (num_valid_neighbors == 1) {
-    return pred.opp_local_idx() == valid_edge->localedgeidx();
+    // return pred.opp_local_idx() == valid_edge->localedgeidx();
+    tile = graphreader.GetGraphTile(valid_edge->endnode());
+    GraphId valid_edge_id = tile->header()->graphid();
+    valid_edge_id.set_id(valid_edge - tile->directededge(0));
+
+    return pred.opp_edgeid() == valid_edge_id.id();
   }
   // REVERSE is this check the same in reverse search
   return false;
@@ -191,15 +200,13 @@ void BidirectionalAStar::ExpandForward(GraphReader& graphreader,
     return;
   }
 
-  // Check if the node in question is a deadend
-  bool is_deadend = is_derived_deadend(graphreader, tile, pred, costing_, edgelabels_forward_, true);
-
   // Expand from end node in forward direction.
   uint32_t shortcuts = 0;
   GraphId edgeid = {node.tileid(), node.level(), nodeinfo->edge_index()};
   EdgeStatusInfo* edge_status = edgestatus_forward_.GetPtr(edgeid, tile);
   const DirectedEdge* directededge = tile->directededge(edgeid);
 
+  bool is_deadend = is_derived_deadend(graphreader, tile, pred, costing_, edgelabels_forward_, true);
   for (uint32_t i = 0; i < nodeinfo->edge_count(); ++i, ++directededge, ++edgeid, ++edge_status) {
     // Skip shortcut edges until we have stopped expanding on the next level. Use regular
     // edges while still expanding on the next level since we can still transition down to
@@ -219,7 +226,7 @@ void BidirectionalAStar::ExpandForward(GraphReader& graphreader,
     // to this directed edge), if no access is allowed (based on costing method),
     // or if a complex restriction prevents transition onto this edge.
     if (edge_status->set() == EdgeSet::kPermanent ||
-        !(costing_->Allowed(directededge, pred, tile, edgeid, 0, 0) && !is_deadend) ||
+        (!costing_->Allowed(directededge, pred, tile, edgeid, 0, 0)) ||
         costing_->Restricted(directededge, pred, edgelabels_forward_, tile, edgeid, true)) {
       continue;
     }
@@ -258,9 +265,14 @@ void BidirectionalAStar::ExpandForward(GraphReader& graphreader,
 
     // Add edge label, add to the adjacency list and set edge status
     uint32_t idx = edgelabels_forward_.size();
+
     edgelabels_forward_.emplace_back(pred_idx, edgeid, oppedge, directededge, newcost, sortcost, dist,
                                      mode_, tc,
                                      (pred.not_thru_pruning() || !directededge->not_thru()));
+    //    bool is_deadend = is_derived_deadend(graphreader, tile, edgelabels_forward_.back(),
+    //    costing_,
+    //                                         edgelabels_forward_, true);
+    edgelabels_forward_.back().set_dead_end(is_deadend);
     adjacencylist_forward_->add(idx);
     *edge_status = {EdgeSet::kTemporary, idx};
 
@@ -303,13 +315,13 @@ void BidirectionalAStar::ExpandReverse(GraphReader& graphreader,
   }
 
   // Check if the node in question is a deadend
-  bool is_deadend = is_derived_deadend(graphreader, tile, pred, costing_, edgelabels_reverse_, false);
 
   // Expand from end node in reverse direction.
   uint32_t shortcuts = 0;
   GraphId edgeid = {graph_id.tileid(), graph_id.level(), nodeinfo->edge_index()};
   EdgeStatusInfo* es = edgestatus_reverse_.GetPtr(edgeid, tile);
   const DirectedEdge* directededge = tile->directededge(edgeid);
+  bool is_deadend = is_derived_deadend(graphreader, tile, pred, costing_, edgelabels_reverse_, false);
   for (uint32_t i = 0; i < nodeinfo->edge_count(); ++i, ++directededge, ++edgeid, ++es) {
     // Skip shortcut edges until we have stopped expanding on the next level. Use regular
     // edges while still expanding on the next level since we can still transition down to
@@ -342,8 +354,7 @@ void BidirectionalAStar::ExpandReverse(GraphReader& graphreader,
 
     // Skip this edge if no access is allowed (based on costing method)
     // or if a complex restriction prevents transition onto this edge.
-    if (!(costing_->AllowedReverse(directededge, pred, opp_edge, t2, oppedge_graph_id, 0, 0) &&
-          !is_deadend) ||
+    if ((!costing_->AllowedReverse(directededge, pred, opp_edge, t2, oppedge_graph_id, 0, 0)) ||
         costing_->Restricted(directededge, pred, edgelabels_reverse_, tile, edgeid, false)) {
       continue;
     }
@@ -380,6 +391,10 @@ void BidirectionalAStar::ExpandReverse(GraphReader& graphreader,
     edgelabels_reverse_.emplace_back(pred_idx, edgeid, oppedge_graph_id, directededge, newcost,
                                      sortcost, dist, mode_, tc,
                                      (pred.not_thru_pruning() || !directededge->not_thru()));
+    //    bool is_deadend = is_derived_deadend(graphreader, tile, edgelabels_reverse_.back(),
+    //    costing_,
+    //                                         edgelabels_reverse_, false);
+    edgelabels_reverse_.back().set_dead_end(is_deadend);
     adjacencylist_reverse_->add(idx);
     *es = {EdgeSet::kTemporary, idx};
 
