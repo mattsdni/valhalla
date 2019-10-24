@@ -206,7 +206,6 @@ void BidirectionalAStar::ExpandForward(GraphReader& graphreader,
   EdgeStatusInfo* edge_status = edgestatus_forward_.GetPtr(edgeid, tile);
   const DirectedEdge* directededge = tile->directededge(edgeid);
 
-  bool is_deadend = is_derived_deadend(graphreader, tile, pred, costing_, edgelabels_forward_, true);
   for (uint32_t i = 0; i < nodeinfo->edge_count(); ++i, ++directededge, ++edgeid, ++edge_status) {
     // Skip shortcut edges until we have stopped expanding on the next level. Use regular
     // edges while still expanding on the next level since we can still transition down to
@@ -269,9 +268,8 @@ void BidirectionalAStar::ExpandForward(GraphReader& graphreader,
     edgelabels_forward_.emplace_back(pred_idx, edgeid, oppedge, directededge, newcost, sortcost, dist,
                                      mode_, tc,
                                      (pred.not_thru_pruning() || !directededge->not_thru()));
-    //    bool is_deadend = is_derived_deadend(graphreader, tile, edgelabels_forward_.back(),
-    //    costing_,
-    //                                         edgelabels_forward_, true);
+    bool is_deadend = is_derived_deadend(graphreader, tile, edgelabels_forward_.back(), costing_,
+                                         edgelabels_forward_, true);
     edgelabels_forward_.back().set_dead_end(is_deadend);
     adjacencylist_forward_->add(idx);
     *edge_status = {EdgeSet::kTemporary, idx};
@@ -321,7 +319,6 @@ void BidirectionalAStar::ExpandReverse(GraphReader& graphreader,
   GraphId edgeid = {graph_id.tileid(), graph_id.level(), nodeinfo->edge_index()};
   EdgeStatusInfo* es = edgestatus_reverse_.GetPtr(edgeid, tile);
   const DirectedEdge* directededge = tile->directededge(edgeid);
-  bool is_deadend = is_derived_deadend(graphreader, tile, pred, costing_, edgelabels_reverse_, false);
   for (uint32_t i = 0; i < nodeinfo->edge_count(); ++i, ++directededge, ++edgeid, ++es) {
     // Skip shortcut edges until we have stopped expanding on the next level. Use regular
     // edges while still expanding on the next level since we can still transition down to
@@ -391,9 +388,8 @@ void BidirectionalAStar::ExpandReverse(GraphReader& graphreader,
     edgelabels_reverse_.emplace_back(pred_idx, edgeid, oppedge_graph_id, directededge, newcost,
                                      sortcost, dist, mode_, tc,
                                      (pred.not_thru_pruning() || !directededge->not_thru()));
-    //    bool is_deadend = is_derived_deadend(graphreader, tile, edgelabels_reverse_.back(),
-    //    costing_,
-    //                                         edgelabels_reverse_, false);
+    bool is_deadend = is_derived_deadend(graphreader, tile, edgelabels_reverse_.back(), costing_,
+                                         edgelabels_reverse_, false);
     edgelabels_reverse_.back().set_dead_end(is_deadend);
     adjacencylist_reverse_->add(idx);
     *es = {EdgeSet::kTemporary, idx};
