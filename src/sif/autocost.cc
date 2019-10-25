@@ -368,7 +368,7 @@ bool AutoCost::Allowed(const baldr::DirectedEdge* edge,
   // a not thru region and a heading selected an edge entering the
   // region.
   if (!(edge->forwardaccess() & kAutoAccess) ||
-      //(!pred.deadend() && pred.opp_local_idx() == edge->localedgeidx()) ||
+      (!pred.deadend() && pred.opp_local_idx() == edge->localedgeidx()) ||
       (pred.restrictions() & (1 << edge->localedgeidx())) ||
       edge->surface() == Surface::kImpassable || IsUserAvoidEdge(edgeid) ||
       (!allow_destination_only_ && !pred.destonly() && edge->destonly())) {
