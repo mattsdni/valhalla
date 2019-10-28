@@ -33,15 +33,8 @@ bool is_derived_deadend(GraphReader& graphreader,
                         const BDEdgeLabel& pred_edge_label,
                         const std::shared_ptr<sif::DynamicCost>& costing,
                         const vector<sif::BDEdgeLabel>& edgelabels,
-                        bool is_forward_search) {
-
-  if (is_forward_search) {
-    cout << "forward: " << pred_edge_label.edgeid().value << "    "
-         << get_shape(graphreader, pred_edge_label.edgeid()) << endl;
-  } else {
-    cout << "backward " << pred_edge_label.edgeid().value << "    "
-         << get_shape(graphreader, pred_edge_label.edgeid()) << endl;
-  }
+                        bool is_forward_search,
+                        u_int32_t access_mode) {
 
   std::array<const GraphTile*, 5> sibling_tiles{};
   sibling_tiles[0] = tile;
@@ -67,9 +60,9 @@ bool is_derived_deadend(GraphReader& graphreader,
         if (!costing->Allowed(&outgoing_candidate_edge, pred_edge_label, tile, out_going_edge_id, 0,
                               0)) {
           continue;
-        }
-
-        if (out_going_edge_id == pred_edge_label.opp_edgeid()) {
+        } else if (!(outgoing_candidate_edge.forwardaccess() & access_mode)) {
+          continue;
+        } else if (out_going_edge_id == pred_edge_label.opp_edgeid()) {
           continue;
         }
 
@@ -85,9 +78,9 @@ bool is_derived_deadend(GraphReader& graphreader,
         if (!costing->AllowedReverse(&outgoing_candidate_edge, pred_edge_label,
                                      incoming_candidate_edge, tile2, incoming_edge_id, 0, 0)) {
           continue;
-        }
-
-        if (incoming_edge_id == pred_edge_label.edgeid()) {
+        } else if (!(outgoing_candidate_edge.reverseaccess() & access_mode)) {
+          continue;
+        } else if (incoming_edge_id == pred_edge_label.edgeid()) {
           continue;
         }
 
@@ -271,7 +264,7 @@ void BidirectionalAStar::ExpandForward(GraphReader& graphreader,
                                      mode_, tc,
                                      (pred.not_thru_pruning() || !directededge->not_thru()));
     bool is_deadend = is_derived_deadend(graphreader, tile, edgelabels_forward_.back(), costing_,
-                                         edgelabels_forward_, true);
+                                         edgelabels_forward_, true, access_mode_);
     edgelabels_forward_.back().set_dead_end(is_deadend);
     adjacencylist_forward_->add(idx);
     *edge_status = {EdgeSet::kTemporary, idx};
@@ -391,7 +384,7 @@ void BidirectionalAStar::ExpandReverse(GraphReader& graphreader,
                                      sortcost, dist, mode_, tc,
                                      (pred.not_thru_pruning() || !directededge->not_thru()));
     bool is_deadend = is_derived_deadend(graphreader, tile, edgelabels_reverse_.back(), costing_,
-                                         edgelabels_reverse_, false);
+                                         edgelabels_reverse_, false, access_mode_);
     edgelabels_reverse_.back().set_dead_end(is_deadend);
     adjacencylist_reverse_->add(idx);
     *es = {EdgeSet::kTemporary, idx};
