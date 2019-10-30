@@ -94,6 +94,44 @@ bool ParseArguments(int argc, char* argv[]) {
   return false;
 }
 
+
+struct edge_t {
+  GraphId i;
+  const DirectedEdge* e;
+  operator const GraphId&() const {
+    return i;
+  }
+  operator const DirectedEdge*() const {
+    return e;
+  }
+  operator bool() const {
+    return i.Is_Valid() && e;
+  }
+};
+
+void extend(GraphReader& reader,
+            const GraphTile*& tile,
+            const edge_t& edge,
+            std::list<PointLL>& shape) {
+  // get the shape
+  if (edge.i.Tile_Base() != tile->id()) {
+    tile = reader.GetGraphTile(edge.i);
+  }
+  // get the shape
+  auto info = tile->edgeinfo(edge.e->edgeinfo_offset());
+  auto more = valhalla::midgard::decode7<std::list<PointLL>>(info.encoded_shape());
+  // this shape runs the other way
+  if (!edge.e->forward()) {
+    more.reverse();
+  }
+  // connecting another shape we dont want dups where they meet
+  if (shape.size()) {
+    more.pop_front();
+  }
+  shape.splice(shape.end(), more);
+}
+
+
 // Main application to create a list wayids and directed edges belonging
 // to ways that are driveable.
 int main(int argc, char** argv) {
@@ -135,6 +173,18 @@ int main(int argc, char** argv) {
       if (!(edge->forwardaccess() & kAutoAccess)) {
         continue;
       }
+
+      // make edge_t
+      std::list<edge_t> my_edge_t{edge_it, edge};
+
+      // Get shape
+      std::list<PointLL> shape;
+      for (const auto& e : edges) {
+        extend(reader, t, e, shape);
+        break;
+      }
+
+      // Get other attrs?
 
       // Get the way Id
       uint64_t wayid = tile->edgeinfo(edge->edgeinfo_offset()).wayid();

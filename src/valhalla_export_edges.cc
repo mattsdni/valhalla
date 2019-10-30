@@ -329,26 +329,113 @@ int main(int argc, char* argv[]) {
         edges.push_front(other);
       }
 
-      // get the shape
-      std::list<PointLL> shape;
-      for (const auto& e : edges) {
-        extend(reader, t, e, shape);
-      }
+      // get the shape per edge
+      //std::list<std::list<PointLL>> shape_list;
+      //for (const auto& e : edges) {
+        //std::list<PointLL> shape_tmp;
+        //shape_list.push_back(shape_tmp);
+        //extend(reader, t, e, shape_tmp);
+      //}
 
-      // output it as: shape,name,name,...
-      auto encoded = encode(shape);
-      std::cout << encoded << column_separator;
-      for (const auto& name : names) {
-        std::cout << name << (&name == &names.back() ? "" : column_separator);
+
+
+      // get edge ids
+      std::list<GraphId> ids;
+      for (const auto& e : edges) {
+        ids.push_back(e.e);
+        std::cout << e.e.value << column_separator;
       }
       std::cout << row_separator;
+
+      // get the shape
+      for (const auto& e : edges) {
+        std::list<PointLL> shape;
+        extend(reader, t, e, shape);
+        auto encoded = encode(shape);
+        std::cout << encoded << column_separator;
+      }
+      std::cout << row_separator;
+
+      // output it as: len(id),id,id,...shape,name,name,...
+//      for (const auto& id : ids) {
+//        std::cout << id.value << column_separator;
+//      }
+//      auto encoded = encode(shape);
+//      std::cout << encoded << column_separator;
+//      for (const auto& name : names) {
+//        std::cout << name << (&name == &names.back() ? "" : column_separator);
+//      }
+//      std::cout << row_separator;
       std::cout.flush();
+
+
+
+
+//      // get the shape
+//      std::list<PointLL> shape;
+//      for (const auto& e : edges) {
+//        extend(reader, t, e, shape);
+//        break;
+//      }
+//
+//      // get edge ids
+//      std::list<GraphId> ids;
+//      for (const auto& e : edges) {
+//        ids.push_back(e.i);
+//        break;
+//      }
+//
+//      // output it as: len(id),id,id,...shape,name,name,...
+//      std::cout << ids.size() << column_separator;
+//      for (const auto& id : ids) {
+//        std::cout << id.value << column_separator;
+//      }
+//      auto encoded = encode(shape);
+//      std::cout << encoded << column_separator;
+//      for (const auto& name : names) {
+//        std::cout << name << (&name == &names.back() ? "" : column_separator);
+//      }
+//      std::cout << row_separator;
+//      std::cout.flush();
+
+
+
+
+      // Alternate output: edge_id, LINESTRING(lat,lon)
+//      std::list<GraphId>::iterator id_it = ids.begin();
+//      std::list<PointLL>::iterator shape_it = shape.begin();
+//      while(id_it != ids.end() && shape_it != shape.end()) {
+//        auto shape_next = std::next(shape_it, 1);
+//        std::cout << id_it->value << column_separator << "LINESTRING(" << shape_it->lng() << " " << shape_it->lat() << "," << shape_next->lng() << " "  << shape_next->lat() << ")";
+//        std::cout << row_separator;
+//        std::cout.flush();
+//        id_it++;
+//        shape_it++;
+//      }
+      // End alternate output
+
+
+      // Alternate output 2 <1:1 edge_id to shape_list>
+//      std::list<GraphId>::iterator id_it = ids.begin();
+//      std::list<std::list<PointLL>>::iterator shape_it = shape_list.begin();
+//      while(id_it != ids.end() && shape_it != shape_list.end()) {
+//        //auto shape_next = std::next(shape_it, 1);
+//        std::cout << id_it->value << column_separator;
+//        auto encoded = encode(shape_it);
+//        std::cout << encoded << column_separator;
+//        std::cout << row_separator;
+//        std::cout.flush();
+//        id_it++;
+//        shape_it++;
+//      }
+      // End alternate output 2
+
     }
 
     // check progress
-    int procent = (100.f * set) / edge_count;
-    if (procent > progress) {
-      LOG_INFO(std::to_string(progress = procent) + "%");
+    int percent = (100.f * set) / edge_count;
+    if (percent > progress) {
+      LOG_INFO(std::to_string(progress = percent) + "%");
     }
   }
   LOG_INFO("Done");
